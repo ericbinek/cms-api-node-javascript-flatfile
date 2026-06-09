@@ -1,0 +1,13 @@
+name: cms-api-node-javascript-flatfile
+
+services:
+  app:
+    container_name: cms-api-node-javascript-flatfile
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      PORT: "3000"
+      DATA_DIR: /app/data
