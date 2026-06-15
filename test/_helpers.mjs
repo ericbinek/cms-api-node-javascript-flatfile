@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 
 import * as BlogPosting from '../src/models/BlogPosting.mjs';
 import * as Person from '../src/models/Person.mjs';
@@ -14,6 +15,8 @@ import * as DefinedTerm from '../src/models/DefinedTerm.mjs';
 import * as DefinedTermSet from '../src/models/DefinedTermSet.mjs';
 import * as Comment from '../src/models/Comment.mjs';
 import * as WebSite from '../src/models/WebSite.mjs';
+import { hashPassword } from '../src/models/account.mjs';
+import { READONLY_FIELDS } from '../src/lib/access.mjs';
 
 const MODELS = {
   BlogPosting,
@@ -36,12 +39,57 @@ function pluralKebab(name) {
 
 let portCounter = 14000 + Math.floor(Math.random() * 1000);
 
-export async function startServer() {
+// Auth is mandatory on writes. The entity suite drives the API as an admin (who
+// sees and may do everything), so the CRUD contract is exercised unchanged. The
+// active bearer token is module scoped so the request helpers can attach it
+// without threading it through every call.
+const DEFAULT_ADMIN = { username: 'admin', password: 'bootstrap-admin-secret', role: 'admin' };
+let authToken = null;
+
+function authHeaders(extra = {}) {
+  return authToken ? { Authorization: `Bearer ${authToken}`, ...extra } : { ...extra };
+}
+
+// fetch with the active bearer token attached (caller headers win on conflict).
+export function authedFetch(url, opts = {}) {
+  return fetch(url, { ...opts, headers: authHeaders(opts.headers || {}) });
+}
+
+export function setAuthToken(token) {
+  authToken = token;
+}
+
+function accountRecord({ username, password, role }) {
+  return { id: randomUUID(), username, passwordHash: hashPassword(password), role };
+}
+
+export async function login(baseUrl, username, password) {
+  const r = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  if (r.status !== 200) throw new Error(`login(${username}) failed with ${r.status}`);
+  return (await r.json()).token;
+}
+
+// Starts a fresh server against a temp data dir. By default the account store is
+// seeded with one admin, and the returned server carries that admin's token.
+// Pass { accounts: [...] } to seed a specific set, or { env: { ADMIN_USER, ... } }
+// to exercise the env bootstrap (no store written).
+export async function startServer({ accounts, env } = {}) {
   const port = portCounter++;
   const dataDir = await mkdtemp(join(tmpdir(), 'cms-test-'));
+
+  let seed = accounts;
+  if (seed === undefined && env === undefined) seed = [DEFAULT_ADMIN];
+  if (seed !== undefined) {
+    await writeFile(join(dataDir, 'accounts.json'), JSON.stringify(seed.map(accountRecord), null, 2));
+  }
+
   const child = spawn(process.execPath, ['src/server.mjs'], {
     cwd: REPO_ROOT,
-    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir },
+    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, ...(env || {}) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stderr.on('data', () => {});
@@ -51,9 +99,15 @@ export async function startServer() {
     try {
       const r = await fetch(`${baseUrl}/health`);
       if (r.ok) {
+        const admin = (seed || []).find((a) => a.role === 'admin');
+        const token = admin ? await login(baseUrl, admin.username, admin.password) : null;
+        authToken = token;
         return {
           baseUrl,
+          dataDir,
+          token,
           async stop() {
+            authToken = null;
             child.kill('SIGTERM');
             await new Promise((r) => child.on('exit', r));
             await rm(dataDir, { recursive: true, force: true });
@@ -94,11 +148,14 @@ async function sampleOne(baseUrl, spec) {
   throw new Error(`unknown spec kind: ${spec.kind}`);
 }
 
+// Builds a request body. System and internal fields are never sent — they are
+// not client writable and would be rejected with 400.
 export async function buildPayload(baseUrl, entity, { partial = false } = {}) {
   const Model = MODELS[entity];
   if (!Model) throw new Error(`unknown entity: ${entity}`);
   const payload = {};
   for (const [name, spec] of Object.entries(Model.SCHEMA.FIELDS)) {
+    if (READONLY_FIELDS.has(name)) continue;
     if (!partial && !Model.SCHEMA.REQUIRED_FIELDS.has(name)) continue;
     payload[name] = await sampleValue(baseUrl, spec);
   }
@@ -111,7 +168,7 @@ export async function makeDep(baseUrl, entity) {
   const payload = await buildPayload(baseUrl, entity);
   const r = await fetch(`${baseUrl}/${pluralKebab(entity)}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   if (r.status !== 201) {
@@ -124,7 +181,7 @@ export async function makeDep(baseUrl, entity) {
 export async function postEntity(baseUrl, entity, payload) {
   return fetch(`${baseUrl}/${pluralKebab(entity)}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
 }

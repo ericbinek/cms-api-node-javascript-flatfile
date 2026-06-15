@@ -14,6 +14,14 @@ export function invalidIdError(path) {
   return createError(400, 'INVALID_ID', 'ID must be a valid UUID.', [], path);
 }
 
+export function unauthorizedError(path) {
+  return createError(401, 'UNAUTHORIZED', 'Authentication is required, or the session is invalid or expired.', [], path);
+}
+
+export function forbiddenError(message, path) {
+  return createError(403, 'FORBIDDEN', message || 'You do not have permission to perform this operation.', [], path);
+}
+
 export function notFoundError(resource, path) {
   return createError(404, 'NOT_FOUND', `${resource} not found.`, [], path);
 }
