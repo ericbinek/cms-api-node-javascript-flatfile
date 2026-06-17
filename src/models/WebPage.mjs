@@ -19,8 +19,9 @@ const FIELDS = {
   "description": { kind: 'scalar', type: "Text", cardinality: "one" },
   "text": { kind: 'scalar', type: "Text", cardinality: "one" },
   "author": { kind: 'ref', targets: ["Person"], cardinality: "one" },
+  "publisher": { kind: 'ref', targets: ["Organization"], cardinality: "one" },
   "primaryImageOfPage": { kind: 'ref', targets: ["ImageObject"], cardinality: "one" },
-  "isPartOf": { kind: 'ref', targets: ["WebPage"], cardinality: "one" },
+  "isPartOf": { kind: 'ref', targets: ["WebSite"], cardinality: "one" },
   "datePublished": { kind: 'scalar', type: "DateTime", cardinality: "one" },
   "dateModified": { kind: 'scalar', type: "DateTime", cardinality: "one" },
   "dateCreated": { kind: 'scalar', type: "DateTime", cardinality: "one" },
@@ -35,7 +36,7 @@ const SORTABLE_FIELDS = new Set(["dateCreated", "dateModified", ...["headline","
 
 const SYSTEM_FIELDS = new Set(['id', 'dateCreated', 'dateModified', '@context', '@type']);
 
-const REF_COLLECTIONS = {"Person":"persons.json","ImageObject":"image-objects.json","WebPage":"web-pages.json"};
+const REF_COLLECTIONS = {"Person":"persons.json","Organization":"organizations.json","ImageObject":"image-objects.json","WebSite":"web-sites.json"};
 
 function isEmpty(value) {
   if (value === undefined || value === null) return true;

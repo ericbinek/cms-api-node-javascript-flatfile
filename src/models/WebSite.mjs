@@ -20,6 +20,7 @@ const FIELDS = {
   "url": { kind: 'scalar', type: "URL", cardinality: "one" },
   "inLanguage": { kind: 'embed', type: "Language", cardinality: "one" },
   "image": { kind: 'ref', targets: ["ImageObject"], cardinality: "one" },
+  "publisher": { kind: 'ref', targets: ["Organization"], cardinality: "one" },
 };
 const FIELD_NAMES = new Set(Object.keys(FIELDS));
 const REQUIRED_FIELDS = new Set(["name","url"]);
@@ -28,7 +29,7 @@ const SORTABLE_FIELDS = new Set(["dateCreated", "dateModified", ...["name","desc
 
 const SYSTEM_FIELDS = new Set(['id', 'dateCreated', 'dateModified', '@context', '@type']);
 
-const REF_COLLECTIONS = {"ImageObject":"image-objects.json"};
+const REF_COLLECTIONS = {"ImageObject":"image-objects.json","Organization":"organizations.json"};
 
 function isEmpty(value) {
   if (value === undefined || value === null) return true;

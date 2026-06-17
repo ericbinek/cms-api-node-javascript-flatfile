@@ -13,14 +13,18 @@ import { seedAdmin } from './models/account.mjs';
 import { handleAuthRoutes } from './routers/auth.router.mjs';
 import { handleRoutes as handleBlogPosting } from './routers/blog-posting.router.mjs';
 import { handleRoutes as handlePerson } from './routers/person.router.mjs';
+import { handleRoutes as handleOrganization } from './routers/organization.router.mjs';
 import { handleRoutes as handleWebPage } from './routers/web-page.router.mjs';
 import { handleRoutes as handleImageObject } from './routers/image-object.router.mjs';
+import { handleRoutes as handleVideoObject } from './routers/video-object.router.mjs';
+import { handleRoutes as handleAudioObject } from './routers/audio-object.router.mjs';
 import { handleRoutes as handleCategoryCode } from './routers/category-code.router.mjs';
 import { handleRoutes as handleCategoryCodeSet } from './routers/category-code-set.router.mjs';
 import { handleRoutes as handleDefinedTerm } from './routers/defined-term.router.mjs';
 import { handleRoutes as handleDefinedTermSet } from './routers/defined-term-set.router.mjs';
 import { handleRoutes as handleComment } from './routers/comment.router.mjs';
 import { handleRoutes as handleWebSite } from './routers/web-site.router.mjs';
+import { handleRoutes as handleSiteNavigationElement } from './routers/site-navigation-element.router.mjs';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -74,12 +78,24 @@ async function handleRequest(req, res) {
       const handled = await handlePerson(req, res, url, requestPath, principal);
       if (handled) return;
     }
+    if (pathname === '/organizations' || pathname.startsWith('/organizations/')) {
+      const handled = await handleOrganization(req, res, url, requestPath, principal);
+      if (handled) return;
+    }
     if (pathname === '/web-pages' || pathname.startsWith('/web-pages/')) {
       const handled = await handleWebPage(req, res, url, requestPath, principal);
       if (handled) return;
     }
     if (pathname === '/image-objects' || pathname.startsWith('/image-objects/')) {
       const handled = await handleImageObject(req, res, url, requestPath, principal);
+      if (handled) return;
+    }
+    if (pathname === '/video-objects' || pathname.startsWith('/video-objects/')) {
+      const handled = await handleVideoObject(req, res, url, requestPath, principal);
+      if (handled) return;
+    }
+    if (pathname === '/audio-objects' || pathname.startsWith('/audio-objects/')) {
+      const handled = await handleAudioObject(req, res, url, requestPath, principal);
       if (handled) return;
     }
     if (pathname === '/category-codes' || pathname.startsWith('/category-codes/')) {
@@ -104,6 +120,10 @@ async function handleRequest(req, res) {
     }
     if (pathname === '/web-sites' || pathname.startsWith('/web-sites/')) {
       const handled = await handleWebSite(req, res, url, requestPath, principal);
+      if (handled) return;
+    }
+    if (pathname === '/site-navigation-elements' || pathname.startsWith('/site-navigation-elements/')) {
+      const handled = await handleSiteNavigationElement(req, res, url, requestPath, principal);
       if (handled) return;
     }
 

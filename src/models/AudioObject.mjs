@@ -11,38 +11,29 @@ import {
 } from '../lib/validation.mjs';
 import { withLock, readCollection, writeCollection } from '../lib/storage.mjs';
 
-const COLLECTION_FILE = "blog-postings.json";
-const TYPE_NAME = 'BlogPosting';
+const COLLECTION_FILE = "audio-objects.json";
+const TYPE_NAME = 'AudioObject';
 
 const FIELDS = {
-  "headline": { kind: 'scalar', type: "Text", cardinality: "one" },
-  "alternativeHeadline": { kind: 'scalar', type: "Text", cardinality: "one" },
+  "name": { kind: 'scalar', type: "Text", cardinality: "one" },
   "description": { kind: 'scalar', type: "Text", cardinality: "one" },
-  "articleBody": { kind: 'scalar', type: "Text", cardinality: "one" },
-  "author": { kind: 'ref', targets: ["Person"], cardinality: "one" },
-  "publisher": { kind: 'ref', targets: ["Organization"], cardinality: "one" },
-  "image": { kind: 'ref', targets: ["ImageObject"], cardinality: "many" },
-  "video": { kind: 'ref', targets: ["VideoObject"], cardinality: "many" },
-  "audio": { kind: 'ref', targets: ["AudioObject"], cardinality: "many" },
-  "keywords": { kind: 'ref', targets: ["DefinedTerm"], cardinality: "many" },
-  "about": { kind: 'ref', targets: ["CategoryCode"], cardinality: "many" },
-  "datePublished": { kind: 'scalar', type: "DateTime", cardinality: "one" },
-  "dateModified": { kind: 'scalar', type: "DateTime", cardinality: "one" },
-  "dateCreated": { kind: 'scalar', type: "DateTime", cardinality: "one" },
-  "url": { kind: 'scalar', type: "URL", cardinality: "one" },
-  "inLanguage": { kind: 'embed', type: "Language", cardinality: "one" },
-  "isAccessibleForFree": { kind: 'scalar', type: "Boolean", cardinality: "one" },
-  "wordCount": { kind: 'scalar', type: "Integer", cardinality: "one" },
-  "creativeWorkStatus": { kind: 'enum', values: ["Draft","Pending","Published","Archived"], cardinality: "one" },
+  "contentUrl": { kind: 'scalar', type: "URL", cardinality: "one" },
+  "encodingFormat": { kind: 'scalar', type: "Text", cardinality: "one" },
+  "duration": { kind: 'scalar', type: "Duration", cardinality: "one" },
+  "transcript": { kind: 'scalar', type: "Text", cardinality: "one" },
+  "uploadDate": { kind: 'scalar', type: "DateTime", cardinality: "one" },
+  "creator": { kind: 'ref', targets: ["Person"], cardinality: "one" },
+  "thumbnail": { kind: 'ref', targets: ["ImageObject"], cardinality: "one" },
+  "productionCompany": { kind: 'ref', targets: ["Organization"], cardinality: "one" },
 };
 const FIELD_NAMES = new Set(Object.keys(FIELDS));
-const REQUIRED_FIELDS = new Set(["headline","articleBody","author"]);
-const SEARCHABLE_FIELDS = new Set(["headline","alternativeHeadline","description","articleBody"]);
-const SORTABLE_FIELDS = new Set(["dateCreated", "dateModified", ...["headline","alternativeHeadline","description","articleBody","datePublished","dateModified","dateCreated","url","isAccessibleForFree","wordCount","creativeWorkStatus"]]);
+const REQUIRED_FIELDS = new Set(["contentUrl"]);
+const SEARCHABLE_FIELDS = new Set(["name","description","encodingFormat","transcript"]);
+const SORTABLE_FIELDS = new Set(["dateCreated", "dateModified", ...["name","description","contentUrl","encodingFormat","duration","transcript","uploadDate"]]);
 
 const SYSTEM_FIELDS = new Set(['id', 'dateCreated', 'dateModified', '@context', '@type']);
 
-const REF_COLLECTIONS = {"Person":"persons.json","Organization":"organizations.json","ImageObject":"image-objects.json","VideoObject":"video-objects.json","AudioObject":"audio-objects.json","DefinedTerm":"defined-terms.json","CategoryCode":"category-codes.json"};
+const REF_COLLECTIONS = {"Person":"persons.json","ImageObject":"image-objects.json","Organization":"organizations.json"};
 
 function isEmpty(value) {
   if (value === undefined || value === null) return true;
