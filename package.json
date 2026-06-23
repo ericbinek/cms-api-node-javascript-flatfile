@@ -1,6 +1,6 @@
 {
   "name": "cms-api-node-javascript-flatfile",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Standalone schema.org-aligned CMS API on Node.js — no runtime dependencies.",
   "license": "MIT",
   "author": "Eric Binek",

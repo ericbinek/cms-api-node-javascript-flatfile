@@ -6,6 +6,7 @@ import {
   normalizeUUID,
   checkScalar,
   isEmbed,
+  sanitizeString,
   deepSanitize,
   etagFor,
 } from '../lib/validation.mjs';
@@ -15,9 +16,9 @@ const COLLECTION_FILE = "web-pages.json";
 const TYPE_NAME = 'WebPage';
 
 const FIELDS = {
-  "headline": { kind: 'scalar', type: "Text", cardinality: "one" },
-  "description": { kind: 'scalar', type: "Text", cardinality: "one" },
-  "text": { kind: 'scalar', type: "Text", cardinality: "one" },
+  "headline": { kind: 'scalar', type: "Text", cardinality: "one", maxLength: 256 },
+  "description": { kind: 'scalar', type: "Text", cardinality: "one", maxLength: 5000, multiline: true },
+  "text": { kind: 'scalar', type: "Text", cardinality: "one", maxLength: 65536, multiline: true },
   "author": { kind: 'ref', targets: ["Person"], cardinality: "one" },
   "publisher": { kind: 'ref', targets: ["Organization"], cardinality: "one" },
   "primaryImageOfPage": { kind: 'ref', targets: ["ImageObject"], cardinality: "one" },
@@ -25,7 +26,7 @@ const FIELDS = {
   "datePublished": { kind: 'scalar', type: "DateTime", cardinality: "one" },
   "dateModified": { kind: 'scalar', type: "DateTime", cardinality: "one" },
   "dateCreated": { kind: 'scalar', type: "DateTime", cardinality: "one" },
-  "url": { kind: 'scalar', type: "URL", cardinality: "one" },
+  "url": { kind: 'scalar', type: "URL", cardinality: "one", maxLength: 2048 },
   "inLanguage": { kind: 'embed', type: "Language", cardinality: "one" },
   "creativeWorkStatus": { kind: 'enum', values: ["Draft","Pending","Published","Archived"], cardinality: "one" },
 };
@@ -50,6 +51,8 @@ function checkOne(spec, value, path) {
   if (spec.kind === 'scalar') {
     if (!checkScalar(spec.type, value)) {
       errors.push(`Field "${path}" must be a ${spec.type}.`);
+    } else if (spec.maxLength !== undefined && typeof value === 'string' && value.length > spec.maxLength) {
+      errors.push(`Field "${path}" must be at most ${spec.maxLength} characters.`);
     }
   } else if (spec.kind === 'enum') {
     if (!spec.values.includes(value)) {
@@ -119,6 +122,28 @@ export function validate(data, { partial = false } = {}) {
   }
 
   return errors;
+}
+
+// Field-aware input cleaning, run before validation and storage: each known
+// scalar string is normalized, stripped of control characters and trimmed,
+// with long-form (multiline) fields keeping their internal line breaks. Refs,
+// embeds, arrays and other values fall back to the conservative property-blind
+// sanitizer. The body is cleaned in place: every key is left where it is —
+// dangerous keys (__proto__, …) are deliberately untouched so validate() can
+// reject the body, rather than silently dropped here.
+export function sanitize(data) {
+  if (!isObject(data)) return data;
+  for (const key of Object.keys(data)) {
+    if (isDangerousKey(key)) continue;
+    const value = data[key];
+    const spec = FIELDS[key];
+    if (spec && spec.kind === 'scalar' && typeof value === 'string') {
+      data[key] = sanitizeString(value, { multiline: spec.multiline === true });
+    } else {
+      data[key] = deepSanitize(value);
+    }
+  }
+  return data;
 }
 
 function normalizeRefs(data) {
@@ -218,7 +243,7 @@ export async function embedRefs(item) {
 
 export function create(rawData) {
   return withLock(async () => {
-    const data = normalizeRefs(deepSanitize(rawData));
+    const data = normalizeRefs(rawData);
     const items = await readCollection(COLLECTION_FILE);
     const now = new Date().toISOString();
     const item = {
@@ -242,7 +267,7 @@ export function update(id, rawData) {
     const index = items.findIndex((item) => item.id === normalized);
     if (index === -1) return null;
 
-    const data = normalizeRefs(deepSanitize(rawData));
+    const data = normalizeRefs(rawData);
     const updated = {
       ...items[index],
       ...data,
