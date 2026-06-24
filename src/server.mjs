@@ -6,6 +6,7 @@ import {
   payloadTooLargeError,
   unsupportedMediaTypeError,
   unauthorizedError,
+  validationError,
   internalError,
 } from './errors.mjs';
 import { resolvePrincipal, requiresSession, UnauthorizedError } from './lib/auth.mjs';
@@ -137,6 +138,11 @@ async function handleRequest(req, res) {
     }
     if (error.name === 'UnsupportedMediaTypeError') {
       return jsonError(req, res, unsupportedMediaTypeError(requestPath));
+    }
+    // A unique-key collision surfaces from the model as a contract violation,
+    // reported in the existing validation envelope (400), not a new error type.
+    if (error.name === 'DuplicateError') {
+      return jsonError(req, res, validationError(error.details, requestPath));
     }
     if (error instanceof RangeError) {
       return jsonError(req, res, payloadTooLargeError(requestPath));

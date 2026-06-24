@@ -37,13 +37,17 @@ const FIELDS = {
   "creativeWorkStatus": { kind: 'enum', values: ["Draft","Pending","Published","Archived"], cardinality: "one" },
 };
 const FIELD_NAMES = new Set(Object.keys(FIELDS));
-const REQUIRED_FIELDS = new Set(["headline","articleBody","author"]);
+const REQUIRED_FIELDS = new Set(["headline","articleBody","author","url"]);
 const SEARCHABLE_FIELDS = new Set(["headline","alternativeHeadline","description","articleBody"]);
 const SORTABLE_FIELDS = new Set(["dateCreated", "dateModified", ...["headline","alternativeHeadline","description","articleBody","datePublished","dateModified","dateCreated","url","isAccessibleForFree","wordCount","creativeWorkStatus"]]);
 
 const SYSTEM_FIELDS = new Set(['id', 'dateCreated', 'dateModified', '@context', '@type']);
 
 const REF_COLLECTIONS = {"Person":"persons.json","Organization":"organizations.json","ImageObject":"image-objects.json","VideoObject":"video-objects.json","AudioObject":"audio-objects.json","DefinedTerm":"defined-terms.json","CategoryCode":"category-codes.json"};
+
+// Properties whose combined value must be unique across the collection. Empty
+// when the entity allows duplicates.
+const UNIQUE_KEY = ["url"];
 
 function isEmpty(value) {
   if (value === undefined || value === null) return true;
@@ -247,10 +251,28 @@ export async function embedRefs(item) {
   return out;
 }
 
+// A candidate collides when some other record shares every unique-key value.
+// Comparison runs on already-sanitized, ref-normalized data, so equal values
+// are in canonical form. Entities without a key never collide.
+function violatesUniqueKey(items, candidate, excludeId) {
+  if (UNIQUE_KEY.length === 0) return false;
+  return items.some((item) =>
+    item.id !== excludeId && UNIQUE_KEY.every((field) => item[field] === candidate[field]));
+}
+
+function duplicateError() {
+  const message = `A ${TYPE_NAME} with this ${UNIQUE_KEY.join(' and ')} already exists.`;
+  const error = new Error(message);
+  error.name = 'DuplicateError';
+  error.details = [message];
+  return error;
+}
+
 export function create(rawData) {
   return withLock(async () => {
     const data = normalizeRefs(rawData);
     const items = await readCollection(COLLECTION_FILE);
+    if (violatesUniqueKey(items, data, null)) throw duplicateError();
     const now = new Date().toISOString();
     const item = {
       ...data,
@@ -283,6 +305,7 @@ export function update(id, rawData) {
       dateCreated: items[index].dateCreated,
       dateModified: new Date().toISOString(),
     };
+    if (violatesUniqueKey(items, updated, updated.id)) throw duplicateError();
     items[index] = updated;
     await writeCollection(COLLECTION_FILE, items);
     return updated;
@@ -304,4 +327,4 @@ export function etagOf(item) {
   return etagFor(item);
 }
 
-export const SCHEMA = { FIELDS, REQUIRED_FIELDS, SEARCHABLE_FIELDS, SORTABLE_FIELDS, TYPE_NAME, COLLECTION_FILE };
+export const SCHEMA = { FIELDS, REQUIRED_FIELDS, SEARCHABLE_FIELDS, SORTABLE_FIELDS, UNIQUE_KEY, TYPE_NAME, COLLECTION_FILE };

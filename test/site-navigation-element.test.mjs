@@ -243,3 +243,43 @@ test(`${ENTITY}: GET by id leaves an unresolvable "isPartOf" ref as its UUID`, a
   const got = await (await authedFetch(`${server.baseUrl}${BASE}/${created.id}`)).json();
   assert.equal(got["isPartOf"], DANGLING);
 });
+
+const UNIQUE_KEY = ["url"];
+
+function keyFields(record) {
+  const out = {};
+  for (const field of UNIQUE_KEY) out[field] = record[field];
+  return out;
+}
+
+test(`${ENTITY}: duplicate unique key on create is rejected with 400 VALIDATION_ERROR`, async () => {
+  const payload = await buildPayload(server.baseUrl, ENTITY);
+  const first = await postEntity(server.baseUrl, ENTITY, payload);
+  assert.equal(first.status, 201, `first create expected 201, got ${first.status}`);
+  // Re-posting the same payload reuses the same key values, so it must collide.
+  const second = await postEntity(server.baseUrl, ENTITY, payload);
+  assert.equal(second.status, 400);
+  assert.equal((await second.json()).error, 'VALIDATION_ERROR');
+});
+
+test(`${ENTITY}: updating a record without changing its unique key succeeds`, async () => {
+  const item = await fresh();
+  const r = await authedFetch(`${server.baseUrl}${BASE}/${item.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(keyFields(item)),
+  });
+  assert.equal(r.status, 200, `self-update expected 200, got ${r.status}`);
+});
+
+test(`${ENTITY}: updating a record to collide with another's unique key is rejected with 400`, async () => {
+  const a = await fresh();
+  const b = await fresh();
+  const r = await authedFetch(`${server.baseUrl}${BASE}/${b.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(keyFields(a)),
+  });
+  assert.equal(r.status, 400);
+  assert.equal((await r.json()).error, 'VALIDATION_ERROR');
+});
